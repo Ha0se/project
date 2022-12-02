@@ -1,0 +1,102 @@
+diff --git a/expenses/forms.py b/expenses/forms.py
+index 0ad77c0..71d268e 100644
+--- a/expenses/forms.py
++++ b/expenses/forms.py
+@@ -1,12 +1,13 @@
+ from django import forms
+ from .models import Expense
+ 
+-
+ class ExpenseSearchForm(forms.ModelForm):
+     class Meta:
+         model = Expense
+-        fields = ('name',)
++        fields = ('name','category','date',)
+ 
+     def __init__(self, *args, **kwargs):
+         super().__init__(*args, **kwargs)
+         self.fields['name'].required = False
++        self.fields['category'].required = False
++        self.fields['date'].required = False
+\ No newline at end of file
+diff --git a/expenses/models.py b/expenses/models.py
+index 5aaaece..245b6d4 100644
+--- a/expenses/models.py
++++ b/expenses/models.py
+@@ -24,4 +24,4 @@ class Expense(models.Model):
+     date = models.DateField(default=datetime.date.today, db_index=True)
+ 
+     def __str__(self):
+-        return f'{self.date} {self.name} {self.amount}'
++        return f'{self.date} {self.name} {self.amount} {self.category}'
+diff --git a/expenses/templates/expenses/expense_list.html b/expenses/templates/expenses/expense_list.html
+index d15d582..3fb68d9 100644
+--- a/expenses/templates/expenses/expense_list.html
++++ b/expenses/templates/expenses/expense_list.html
+@@ -8,6 +8,13 @@
+   {{form.as_p}}
+   <button type="submit">search</button>
+ </form>
++<!-- # przygotowane pola wyboru daty FROM - TO
++From: <input type="date" name="fromdate"/>
++To: <input type="date" name="todate"/>
++<input type="submit" value="Search"/>
++
++<hr/>
++-->
+ <br>
+ <table border="1">
+ 	<caption>Expenses</caption>
+@@ -56,4 +63,4 @@
+ 	{% endfor %}
+   </tr>
+ </table>
+-{% endblock %}
++{% endblock %}
+\ No newline at end of file
+diff --git a/expenses/views.py b/expenses/views.py
+index aefaae9..4fe4e7b 100644
+--- a/expenses/views.py
++++ b/expenses/views.py
+@@ -1,22 +1,26 @@
+ from django.views.generic.list import ListView
+-
+ from .forms import ExpenseSearchForm
+ from .models import Expense, Category
+ from .reports import summary_per_category
+ 
+-
+ class ExpenseListView(ListView):
+     model = Expense
+     paginate_by = 5
+ 
+     def get_context_data(self, *, object_list=None, **kwargs):
+         queryset = object_list if object_list is not None else self.object_list
+-
+         form = ExpenseSearchForm(self.request.GET)
++
+         if form.is_valid():
+-            name = form.cleaned_data.get('name', '').strip()
++            name = form.cleaned_data.get('name').strip()
++            category = form.cleaned_data.get('category')
++            date = form.cleaned_data.get('date')
+             if name:
+                 queryset = queryset.filter(name__icontains=name)
++            if category:
++                queryset = queryset.filter(category=category)
++            if date:
++                queryset = queryset.filter(date=date)
+ 
+         return super().get_context_data(
+             form=form,
+@@ -24,7 +28,7 @@ class ExpenseListView(ListView):
+             summary_per_category=summary_per_category(queryset),
+             **kwargs)
+ 
++
+ class CategoryListView(ListView):
+     model = Category
+-    paginate_by = 5
+-
++    paginate_by = 5
+\ No newline at end of file
